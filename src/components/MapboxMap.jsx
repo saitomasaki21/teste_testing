@@ -1,128 +1,65 @@
-import React, { useEffect, useRef, useState } from 'react';
+// MapboxMap.js
+import React, { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
-import { createMarkerElement, addMarkersToMap, drawPathOnMap, updateFieldOfView } from '../utils/mapUtils';
 
-export const MapboxMap = ({ accessToken, coordinates, imageIds, viewerRef }) => {
-  const mapboxContainerRef = useRef(null);
-  const mapRef = useRef(null);
-  const fovLayerRef = useRef(null);
-  const markersRef = useRef([]);
-  const [currentImageId, setCurrentImageId] = useState(null);
+mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+
+export const MapboxMap = ({ accessToken, trails, selectedTrail, onTrailSelect }) => {
+  const mapContainer = useRef(null);
+  const map = useRef(null);
 
   useEffect(() => {
-    if (!mapboxContainerRef.current) return;
+    if (!mapContainer.current) return;
 
-    mapboxgl.accessToken = accessToken;
-    const map = new mapboxgl.Map({
-      container: mapboxContainerRef.current,
-      style: 'mapbox://styles/mapbox/streets-v11',
-      center: coordinates[0],
-      zoom: 30,   
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/outdoors-v12',
+      center: selectedTrail.coordinates[0],
+      zoom: 15
     });
 
-    mapRef.current = map;
-
-    map.on('load', () => {
-      markersRef.current = addMarkersToMap(map, coordinates, imageIds, viewerRef, setCurrentImageId);
-      drawPathOnMap(map, coordinates);
-
-      const scale = new mapboxgl.ScaleControl({
-        maxWidth: 80,
-        unit: 'metric'
-      });
-      map.addControl(scale, 'bottom-left');
-
-      class NorthArrowControl {
-        onAdd(map) {
-          this._map = map;
-          this._container = document.createElement('div');
-          this._container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
-          this._container.innerHTML = `
-            <div class="north-arrow">
-              <div class="north-arrow-pointer"></div>
-              <div class="north-arrow-n">N</div>
-            </div>
-          `;
-          return this._container;
-        }
-
-        onRemove() {
-          this._container.parentNode.removeChild(this._container);
-          this._map = undefined;
-        }
-      }
-
-      map.addControl(new NorthArrowControl(), 'top-right');
-
-      map.addSource('fov', {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            type: 'Point',
-            coordinates: coordinates[0],
-          },
-        },
-      });
-
-      map.addLayer({
-        id: 'fov',
-        type: 'symbol',
-        source: 'fov',
-        layout: {
-          'icon-image': 'triangle-15',
-          'icon-rotate': ['get', 'bearing'],
-          'icon-rotation-alignment': 'map',
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-        },
-        paint: {
-          'icon-color': '#3FB1CE',
-          'icon-opacity': 0.8,
-        },
-      });
-
-      fovLayerRef.current = map.getSource('fov');
-    });
-
-    return () => map.remove();
-  }, [accessToken, coordinates, imageIds, viewerRef]);
-
-  useEffect(() => {
-    if (viewerRef.current && mapRef.current && fovLayerRef.current) {
-      const updateFOV = () => {
-        const pov = viewerRef.current.getPointOfView();
-        if (pov) {
-          updateFieldOfView(mapRef.current, fovLayerRef.current, pov);
-          const currentId = viewerRef.current.getCurrentId();
-          if (currentId) {
-            setCurrentImageId(currentId);
+    // Adicionar cada trilha
+    trails.forEach((trail, index) => {
+      map.current.on('load', () => {
+        // Adicionar fonte de dados
+        map.current.addSource(`trail-${trail.id}`, {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'LineString',
+              coordinates: trail.coordinates
+            }
           }
-        }
-      };
+        });
 
-      viewerRef.current.on('position', updateFOV);
-
-      return () => {
-        viewerRef.current.off('position', updateFOV);
-      };
-    }
-  }, [viewerRef]);
-
-  useEffect(() => {
-    if (currentImageId && markersRef.current) {
-      markersRef.current.forEach((marker, index) => {
-        const el = marker.getElement();
-        if (imageIds[index] === currentImageId) {
-          el.style.backgroundColor = '#FF0000'; // Highlight color for current image
-        } else {
-          el.style.backgroundColor = '#3FB1CE'; // Default color
-        }
+        // Adicionar camada de linha
+        map.current.addLayer({
+          id: `trail-${trail.id}`,
+          type: 'line',
+          source: `trail-${trail.id}`,
+          layout: {},
+          paint: {
+            'line-color': trail.id === selectedTrail.id ? '#ff0000' : '#555555',
+            'line-width': 4,
+            'line-opacity': 0.75
+          }
+        });
       });
-    }
-  }, [currentImageId, imageIds]);
 
-  return <div ref={mapboxContainerRef} className="w-1/2 h-full" />;
+      // Evento de clique
+      map.current.on('click', `trail-${trail.id}`, (e) => {
+        onTrailSelect(trail);
+      });
+    });
+
+    return () => {
+      if (map.current) {
+        map.current.remove();
+      }
+    };
+  }, [trails, selectedTrail.id, onTrailSelect]);
+
+  return <div ref={mapContainer} className="w-2/3 h-full" />;
 };
