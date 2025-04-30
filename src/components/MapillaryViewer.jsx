@@ -12,15 +12,15 @@ export const MapillaryViewer = ({ accessToken, imageId, viewerRef }) => {
       container: mapillaryContainerRef.current,
       imageId,
       component: {
-        cover: false,
-        direction: true,  // Habilitado para melhor navegação
-        sequence: true,   // Mostra a sequência de imagens
-        zoom: true,       // Habilita controles de zoom
+        cover: true,     // Esconde elementos de sobreposição
+        direction: false,
+        sequence: false, // Remove a barra de sequência
+        zoom: false,
+        attribution: false // Remove a atribuição
       },
-      renderMode: 'fill', // Preenche o container disponível
+      renderMode: 'fill'
     });
 
-    // Ajusta o tamanho quando a janela muda
     const resizeObserver = new ResizeObserver(() => {
       viewerRef.current.resize();
     });
@@ -38,8 +38,7 @@ export const MapillaryViewer = ({ accessToken, imageId, viewerRef }) => {
   return (
     <div 
       ref={mapillaryContainerRef} 
-      className="w-full h-full relative"
-      style={{ minHeight: '500px' }} // Altura mínima garantida
+      className="w-full h-full bg-gray-800" // Fundo neutro
     />
   );
 };
